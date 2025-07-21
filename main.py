@@ -1,11 +1,9 @@
 # Домашнє завдання - Лабіринт
-# Спосіб організації програми - процедурно-орієнтований
+# Спосіб організації програми - процедурно-орієнтованний спосіб
 # Допомагаємо Шаріку знайти кісточку.
 # Потрібно написати код, який перевіряє, чи правильно Шарік йде по лабіринту.
 
 import os
-#import sys
-#import random
 import pygame
 
 # Ініціалізація гри
@@ -15,6 +13,7 @@ import pygame
 os.environ["SDL_VIDEO_CENTERED"] = "1"
 pygame.init()
 
+# Шлях до файлу з лабіринтом
 FILE_PATH = "levels/0.txt"
 horizontal_length = 0
 
@@ -33,7 +32,10 @@ def read_file_to_list(filepath):
         print(f"Виникла помилка при читанні файла: {e}")
         return None
 
+# Читаємо рівень
 level = read_file_to_list(FILE_PATH)
+if level is None:
+    exit()
 
 # Встановлюємо параметри програми
 MAZE_LENGTH = len(level) * 5
@@ -42,6 +44,7 @@ SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Лабіринт")
 BACKGROUND_COLOR = (255, 255, 255)
 WALL_COLOR = (0, 0, 0)
+ENTER_COLOR = (255, 255, 255)
 DOG_IMAGE = pygame.transform.scale(pygame.image.load('img/dog.jpg').convert_alpha(), (40, 50))
 BONE_IMAGE = pygame.transform.scale(pygame.image.load('img/bone.jpg').convert_alpha(), (50, 40))
 
@@ -49,58 +52,58 @@ BONE_IMAGE = pygame.transform.scale(pygame.image.load('img/bone.jpg').convert_al
 PLAYER_WIDTH = 15
 PLAYER_HEIGHT = 15
 PLAYER_COLOR = (255, 0, 0)
-player_x = (SCREEN_WIDTH - MAZE_LENGTH) / 2 + 5
-player_y = (SCREEN_HEIGHT - MAZE_LENGTH) / 2 + 10
-player_speed = 1
-player_rect = pygame.Rect(player_x, player_y, PLAYER_WIDTH, PLAYER_HEIGHT)
+PLAYER_X = (SCREEN_WIDTH - MAZE_LENGTH) / 2 + 15
+PLAYER_Y = (SCREEN_HEIGHT - MAZE_LENGTH) / 2 + 10
+#player_speed = 1
+player_rect = pygame.Rect(PLAYER_X, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT)
 
 
 # Функція малювання лабіринту
 def load_level():
+    global walls
+    walls = []  # очищаємо список перед завантаженням
     x = (SCREEN_WIDTH - MAZE_LENGTH) / 2
     y = (SCREEN_HEIGHT - MAZE_LENGTH) / 2
     for row in level:
         for col in row:
             if col == "W":
-                r = pygame.Rect(x, y, 5, 5)
-                pygame.draw.rect(SCREEN, WALL_COLOR, r, 0)
-            if col == "E":
-                end_rect = pygame.Rect(x, y, 16, 16)
+                wall_rect = pygame.Rect(x, y, 5, 5)
+                pygame.draw.rect(SCREEN, WALL_COLOR, wall_rect, 0)
+                walls.append(wall_rect)
             x += 5
         y += 5
         x = (SCREEN_WIDTH - MAZE_LENGTH) / 2
 
-
-# Обробка натискань клавіш
-def processing_keystrokes():
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:
-        player_rect.x -= player_speed
-    if keys[pygame.K_RIGHT]:
-        player_rect.x += player_speed
-    if keys[pygame.K_UP]:
-        player_rect.y -= player_speed
-    if keys[pygame.K_DOWN]:
-        player_rect.y += player_speed
-
-    if player_rect.left < 0:
-        player_rect.left = 0
-    if player_rect.right > SCREEN_WIDTH:
-        player_rect.right = SCREEN_WIDTH
-    if player_rect.top < 0:
-        player_rect.top = 0
-    if player_rect.bottom > SCREEN_HEIGHT:
-        player_rect.bottom = SCREEN_HEIGHT
+def move_player(dx, dy):
+    new_rect = player_rect.move(dx, dy)
+    # Перевірка колізій з усіма стінками
+    for wall in walls:
+        if new_rect.colliderect(wall):
+            return  # рух заборонений, вихід
+    # Якщо колізій немає, застосовуємо рух
+    player_rect.x += dx
+    player_rect.y += dy
 
 
 running = True
 while running:
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT:
+                move_player(-30, 0)
+                print(player_rect.x)
+            elif event.key == pygame.K_RIGHT:
+                move_player(30, 0)
+                print(player_rect.x)
+            elif event.key == pygame.K_UP:
+                move_player(0, -30)
+            elif event.key == pygame.K_DOWN:
+                move_player(0, 30)
+            elif event.key == pygame.K_ESCAPE:
+                running = False
+
 
     # Готуємо фон
     SCREEN.fill(BACKGROUND_COLOR)
@@ -112,8 +115,6 @@ while running:
 
     # Встановлюємо гравця в початкове положення
     pygame.draw.rect(SCREEN, PLAYER_COLOR, player_rect)
-    # Обробляємо натискання клавіш
-    processing_keystrokes()
 
     # Обновляем экран
     pygame.display.flip()
