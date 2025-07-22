@@ -54,8 +54,13 @@ PLAYER_HEIGHT = 15
 PLAYER_COLOR = (255, 0, 0)
 PLAYER_X = (SCREEN_WIDTH - MAZE_LENGTH) / 2 + 15
 PLAYER_Y = (SCREEN_HEIGHT - MAZE_LENGTH) / 2 + 10
-#player_speed = 1
 player_rect = pygame.Rect(PLAYER_X, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT)
+
+# Правильний шлях до виходу
+CORRECT_PATH = ['RIGHT', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'DOWN', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'DOWN', 'LEFT', 'DOWN', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'DOWN', 'RIGHT']  # приклад правильного шляху
+path_index = 0  # індекс для правильного шляху
+previous_move = None
+GAME_OVER = False
 
 
 # Функція малювання лабіринту
@@ -74,15 +79,62 @@ def load_level():
         y += 5
         x = (SCREEN_WIDTH - MAZE_LENGTH) / 2
 
+def check_move(direction):
+    global path_index, previous_move, GAME_OVER
+    if GAME_OVER:
+        return
+
+    # Перевірити чи правильний напрямок
+    if path_index < len(CORRECT_PATH) and direction == CORRECT_PATH[path_index]:
+        print("Шарік знайшов правильний шлях")
+        path_index += 1
+        previous_move = direction
+        # Перевірка чи пройшли весь шлях
+        if path_index == len(CORRECT_PATH):
+            print("Вітаємо! Шарік пройшов лабіринт! Перемога!")
+            GAME_OVER = True
+    else:
+        # Перевірка чи йде у бік стіни
+        if direction == 'INVALID':
+            print("Шарік вдарився об стіну, гра завершена.")
+            GAME_OVER = True
+        # Перевірка чи повернув назад
+        elif previous_move and ((direction == 'LEFT' and previous_move == 'RIGHT') or
+                                (direction == 'RIGHT' and previous_move == 'LEFT') or
+                                (direction == 'UP' and previous_move == 'DOWN') or
+                                (direction == 'DOWN' and previous_move == 'UP')):
+            print("Шарік злякався і втік, гра завершена.")
+            GAME_OVER = True
+        else:
+            print("Шарік заблукав, гра завершена.")
+            GAME_OVER = True
+
 def move_player(dx, dy):
-    new_rect = player_rect.move(dx, dy)
+    new_rect = player_rect.move(dx / 2, dy / 2)
+
     # Перевірка колізій з усіма стінками
     for wall in walls:
         if new_rect.colliderect(wall):
+            check_move('INVALID')
             return  # рух заборонений, вихід
-    # Якщо колізій немає, застосовуємо рух
-    player_rect.x += dx
-    player_rect.y += dy
+
+    # Перевірка напрямку
+    if dx > 0:
+        check_move('RIGHT')
+    elif dx < 0:
+        check_move('LEFT')
+    elif dy > 0:
+        check_move('DOWN')
+    elif dy < 0:
+        check_move('UP')
+    else:
+        # Якщо руху немає
+        return
+
+    # Якщо гра не завершена, виконуємо рух
+    if not GAME_OVER:
+        player_rect.x += dx
+        player_rect.y += dy
 
 
 running = True
@@ -91,18 +143,17 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                move_player(-30, 0)
-                print(player_rect.x)
-            elif event.key == pygame.K_RIGHT:
-                move_player(30, 0)
-                print(player_rect.x)
-            elif event.key == pygame.K_UP:
-                move_player(0, -30)
-            elif event.key == pygame.K_DOWN:
-                move_player(0, 30)
-            elif event.key == pygame.K_ESCAPE:
-                running = False
+            if not GAME_OVER:
+                if event.key == pygame.K_LEFT:
+                    move_player(-30, 0)
+                elif event.key == pygame.K_RIGHT:
+                    move_player(30, 0)
+                elif event.key == pygame.K_UP:
+                    move_player(0, -30)
+                elif event.key == pygame.K_DOWN:
+                    move_player(0, 30)
+                elif event.key == pygame.K_ESCAPE:
+                    running = False
 
 
     # Готуємо фон
@@ -113,7 +164,7 @@ while running:
     SCREEN.blit(DOG_IMAGE, [(SCREEN_WIDTH - MAZE_LENGTH) / 2 - 40, (SCREEN_HEIGHT - MAZE_LENGTH) / 2 - 15])
     SCREEN.blit(BONE_IMAGE, [MAZE_LENGTH + 40, MAZE_LENGTH + 15])
 
-    # Встановлюємо гравця в початкове положення
+    # Готує гравця
     pygame.draw.rect(SCREEN, PLAYER_COLOR, player_rect)
 
     # Обновляем экран
