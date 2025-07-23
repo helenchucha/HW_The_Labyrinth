@@ -5,6 +5,7 @@
 
 import os
 import pygame
+from collections import deque
 
 # Ініціалізація та налаштування
 # Налаштування бібліотеки SDL
@@ -37,6 +38,84 @@ if level is None:
     exit()
 
 
+# Визначаємо старт і фініш
+# Тут припустимо, що старт — це перший відкритий вхід (зовнішня клітинка без стін)
+# і аналогічно для фінішу.
+def find_start_end(level):
+    start = None
+    end = None
+    rows = len(level)
+    cols = len(level[0])
+    for r in range(rows):
+        for c in range(cols):
+            if level[r][c] != "W":
+                # пошук старту в перших або останніх рядках/стовпцях
+                if r == 0 or r == rows -1 or c == 0 or c == cols -1:
+                    if start is None:
+                        start = (r, c)
+                    else:
+                        end = (r, c)
+    return start, end
+
+start_pos, end_pos = find_start_end(level)
+if start_pos is None or end_pos is None:
+    print("Не знайдено старт або фініш.")
+    exit()
+else:
+    print("Старт та фініш знайдені")
+
+# Алгоритм BFS для пошуку шляху
+def find_path_bfs(level, start, end):
+    rows = len(level)
+    cols = len(level[0])
+    visited = [[False]*cols for _ in range(rows)]
+    parent = [[None]*cols for _ in range(rows)]
+    queue = deque()
+
+    queue.append(start)
+    visited[start[0]][start[1]] = True
+
+    directions = {
+        'UP': (-1, 0),
+        'DOWN': (1, 0),
+        'LEFT': (0, -1),
+        'RIGHT': (0, 1)
+    }
+
+    while queue:
+        r, c = queue.popleft()
+        if (r, c) == end:
+            # Відновлюємо шлях
+            path = []
+            while (r, c) != start:
+                pr, pc = parent[r][c]
+                if pr == r - 1:
+                    path.append('DOWN')
+                elif pr == r + 1:
+                    path.append('UP')
+                elif pc == c - 1:
+                    path.append('RIGHT')
+                elif pc == c + 1:
+                    path.append('LEFT')
+                r, c = pr, pc
+            path.reverse()
+            return path
+
+        for move, (dr, dc) in directions.items():
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                if not visited[nr][nc] and level[nr][nc] != "W":  # не стіна
+                    visited[nr][nc] = True
+                    parent[nr][nc] = (r, c)
+                    queue.append((nr, nc))
+    return []
+
+# Знаходимо шлях
+CORRECT_PATH = find_path_bfs(level, start_pos, end_pos)
+print("Знайдено шлях:", CORRECT_PATH)
+
+
+
 # Налаштування екрана
 MAZE_LENGTH = len(level) * 5
 SCREEN_WIDTH = SCREEN_HEIGHT = MAZE_LENGTH + 100
@@ -62,6 +141,7 @@ CORRECT_PATH = ['RIGHT', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIG
 path_index = 0  # індекс для правильного шляху
 previous_move = None
 GAME_OVER = False
+game_result = None  # 'WIN', 'HIT_WALL', 'RUN_AWAY', 'LOST'
 
 
 # Функція для малювання рівня
@@ -84,7 +164,7 @@ def load_level():
 
 # Функція для показу повідомлень у конкретних координатах
 def show_message(text, x, y):
-    font = pygame.font.SysFont("Arial", 25)
+    font = pygame.font.SysFont("Arial", 20)
     message = font.render(text, True, (255, 0, 0))
     message_rect = message.get_rect(topleft=(x, y))
     SCREEN.blit(message, message_rect)
@@ -93,7 +173,7 @@ def show_message(text, x, y):
 
 # Функція перевірки правильності руху
 def check_move(direction):
-    global path_index, previous_move, GAME_OVER
+    global path_index, previous_move, GAME_OVER, game_result
     if GAME_OVER:
         return
 
@@ -107,11 +187,13 @@ def check_move(direction):
             print("Вітаємо! Шарік пройшов лабіринт! Перемога!")
             show_message("Перемога! Шарік пройшов лабіринт", 10, 10)
             GAME_OVER = True
+            game_result = 'WIN'
     else:
         # Перевірка чи йде у бік стіни
         if direction == 'INVALID':
             print("Шарік вдарився об стіну, гра завершена.")
             GAME_OVER = True
+            game_result = 'HIT_WALL'
         # Перевірка чи повернув назад
         elif previous_move and ((direction == 'LEFT' and previous_move == 'RIGHT') or
                                 (direction == 'RIGHT' and previous_move == 'LEFT') or
@@ -119,9 +201,11 @@ def check_move(direction):
                                 (direction == 'DOWN' and previous_move == 'UP')):
             print("Шарік злякався і втік, гра завершена.")
             GAME_OVER = True
+            game_result = 'RUN_AWAY'
         else:
             print("Шарік заблукав, гра завершена.")
             GAME_OVER = True
+            game_result = 'LOST'
 
 # Переміщення гравця
 def move_player(dx, dy):
@@ -178,8 +262,14 @@ while running:
 
     if GAME_OVER:
         # Після завершення гри виводимо повідомлення
-        load_level()
-        show_message("Кінець гри", SCREEN_WIDTH//3 + 10, 10)
+        if game_result == 'WIN':
+            show_message("Вітаємо з перемогою!", SCREEN_WIDTH // 4, SCREEN_HEIGHT // 3)
+        elif game_result == 'HIT_WALL':
+            show_message("Шарік вдарився об стіну, гра завершена.", SCREEN_WIDTH // 10, SCREEN_HEIGHT // 3)
+        elif game_result == 'RUN_AWAY':
+            show_message("Шарік злякався і втік, гра завершена.", SCREEN_WIDTH // 5, SCREEN_HEIGHT // 3)
+        elif game_result == 'LOST':
+            show_message("Шарік заблукав, гра завершена.", SCREEN_WIDTH // 5, SCREEN_HEIGHT // 3)
     else:
         # Готуємо рівень
         load_level()
