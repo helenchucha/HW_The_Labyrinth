@@ -6,9 +6,8 @@
 import os
 import pygame
 
-# Ініціалізація гри
+# Ініціалізація та налаштування
 # Налаштування бібліотеки SDL
-# Встановлення змінної середовища SDL_VIDEO_CENTERED у значення 1
 # Вікно програми відкриється по центру екрана
 os.environ["SDL_VIDEO_CENTERED"] = "1"
 pygame.init()
@@ -17,7 +16,8 @@ pygame.init()
 FILE_PATH = "levels/0.txt"
 horizontal_length = 0
 
-# Функція читання схеми лабіринту в список
+
+# Читаємо рівень з файлу
 def read_file_to_list(filepath):
     try:
         with open(filepath, 'r') as file:
@@ -32,19 +32,20 @@ def read_file_to_list(filepath):
         print(f"Виникла помилка при читанні файла: {e}")
         return None
 
-# Читаємо рівень
 level = read_file_to_list(FILE_PATH)
 if level is None:
     exit()
 
-# Встановлюємо параметри програми
+
+# Налаштування екрана
 MAZE_LENGTH = len(level) * 5
 SCREEN_WIDTH = SCREEN_HEIGHT = MAZE_LENGTH + 100
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Лабіринт")
 BACKGROUND_COLOR = (255, 255, 255)
 WALL_COLOR = (0, 0, 0)
-ENTER_COLOR = (255, 255, 255)
+
+# Завантаження зображень
 DOG_IMAGE = pygame.transform.scale(pygame.image.load('img/dog.jpg').convert_alpha(), (40, 50))
 BONE_IMAGE = pygame.transform.scale(pygame.image.load('img/bone.jpg').convert_alpha(), (50, 40))
 
@@ -56,14 +57,15 @@ PLAYER_X = (SCREEN_WIDTH - MAZE_LENGTH) / 2 + 15
 PLAYER_Y = (SCREEN_HEIGHT - MAZE_LENGTH) / 2 + 10
 player_rect = pygame.Rect(PLAYER_X, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT)
 
-# Правильний шлях до виходу
-CORRECT_PATH = ['RIGHT', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'DOWN', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'DOWN', 'LEFT', 'DOWN', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'DOWN', 'RIGHT']  # приклад правильного шляху
+# Визначений правильний шлях (можна змінювати під рівень)
+CORRECT_PATH = ['RIGHT', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'DOWN', 'DOWN', 'RIGHT', 'RIGHT', 'RIGHT', 'RIGHT', 'DOWN', 'LEFT', 'DOWN', 'DOWN', 'LEFT', 'DOWN', 'RIGHT', 'DOWN', 'RIGHT', 'RIGHT']  # приклад правильного шляху
 path_index = 0  # індекс для правильного шляху
 previous_move = None
 GAME_OVER = False
 
 
-# Функція малювання лабіринту
+# Функція для малювання рівня
+# Малює лабіринт і повертає список стін
 def load_level():
     global walls
     walls = []  # очищаємо список перед завантаженням
@@ -79,6 +81,17 @@ def load_level():
         y += 5
         x = (SCREEN_WIDTH - MAZE_LENGTH) / 2
 
+
+# Функція для показу повідомлень у конкретних координатах
+def show_message(text, x, y):
+    font = pygame.font.SysFont("Arial", 25)
+    message = font.render(text, True, (255, 0, 0))
+    message_rect = message.get_rect(topleft=(x, y))
+    SCREEN.blit(message, message_rect)
+    pygame.display.flip()
+
+
+# Функція перевірки правильності руху
 def check_move(direction):
     global path_index, previous_move, GAME_OVER
     if GAME_OVER:
@@ -92,6 +105,7 @@ def check_move(direction):
         # Перевірка чи пройшли весь шлях
         if path_index == len(CORRECT_PATH):
             print("Вітаємо! Шарік пройшов лабіринт! Перемога!")
+            show_message("Перемога! Шарік пройшов лабіринт", 10, 10)
             GAME_OVER = True
     else:
         # Перевірка чи йде у бік стіни
@@ -109,16 +123,18 @@ def check_move(direction):
             print("Шарік заблукав, гра завершена.")
             GAME_OVER = True
 
+# Переміщення гравця
 def move_player(dx, dy):
+    global player_rect
     new_rect = player_rect.move(dx / 2, dy / 2)
 
-    # Перевірка колізій з усіма стінками
+    # Перевірка зіткнення зі стінами
     for wall in walls:
         if new_rect.colliderect(wall):
             check_move('INVALID')
             return  # рух заборонений, вихід
 
-    # Перевірка напрямку
+    # Визначаємо напрямок
     if dx > 0:
         check_move('RIGHT')
     elif dx < 0:
@@ -137,6 +153,7 @@ def move_player(dx, dy):
         player_rect.y += dy
 
 
+# Основний цикл гри
 running = True
 while running:
     for event in pygame.event.get():
@@ -156,18 +173,23 @@ while running:
                     running = False
 
 
-    # Готуємо фон
+    # Малюємо фон
     SCREEN.fill(BACKGROUND_COLOR)
 
-    # Готуємо рівень
-    load_level()
-    SCREEN.blit(DOG_IMAGE, [(SCREEN_WIDTH - MAZE_LENGTH) / 2 - 40, (SCREEN_HEIGHT - MAZE_LENGTH) / 2 - 15])
-    SCREEN.blit(BONE_IMAGE, [MAZE_LENGTH + 40, MAZE_LENGTH + 15])
+    if GAME_OVER:
+        # Після завершення гри виводимо повідомлення
+        load_level()
+        show_message("Кінець гри", SCREEN_WIDTH//3 + 10, 10)
+    else:
+        # Готуємо рівень
+        load_level()
+        SCREEN.blit(DOG_IMAGE, [(SCREEN_WIDTH - MAZE_LENGTH) / 2 - 40, (SCREEN_HEIGHT - MAZE_LENGTH) / 2 - 15])
+        SCREEN.blit(BONE_IMAGE, [MAZE_LENGTH + 40, MAZE_LENGTH + 15])
+        # Малюємо рівень та гравця
+        pygame.draw.rect(SCREEN, PLAYER_COLOR, player_rect)
 
-    # Готує гравця
-    pygame.draw.rect(SCREEN, PLAYER_COLOR, player_rect)
 
-    # Обновляем экран
+    # Оновлюємо екран
     pygame.display.flip()
 
 pygame.quit()
